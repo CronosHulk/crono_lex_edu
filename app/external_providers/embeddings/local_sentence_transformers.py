@@ -4,13 +4,13 @@ import importlib.util
 from typing import Any
 
 MISSING_DEPENDENCY_ERROR = (
-    "sentence-transformers is not installed. Run embeddings via the app-embedding-worker "
+    "fastembed is not installed. Run embeddings via the app-embedding-worker "
     "image built from Dockerfile.embeddings."
 )
 
 
 def ensure_runtime_available() -> None:
-    if importlib.util.find_spec("sentence_transformers") is None:
+    if importlib.util.find_spec("fastembed") is None:
         raise RuntimeError(MISSING_DEPENDENCY_ERROR)
 
 
@@ -34,9 +34,9 @@ def build_embedding_input(
 
 def build_encoder(*, model_name: str, device: str) -> Any:
     try:
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
     except ModuleNotFoundError as error:
-        if error.name == "sentence_transformers":
+        if error.name == "fastembed":
             raise RuntimeError(MISSING_DEPENDENCY_ERROR) from error
         raise
 
@@ -45,7 +45,9 @@ def build_encoder(*, model_name: str, device: str) -> Any:
     encoder = cache.get(cache_key)
     if encoder is not None:
         return encoder
-    encoder = SentenceTransformer(model_name, device=device)
+    
+    # fastembed uses ONNX runtime under the hood, optimized for CPU execution out-of-the-box.
+    encoder = TextEmbedding(model_name=model_name)
     cache[cache_key] = encoder
     setattr(build_encoder, "_cache", cache)
     return encoder
@@ -74,11 +76,7 @@ def build_embedding(
         part_of_speech=part_of_speech,
         examples_json=examples_json,
     )
-    vector = encoder.encode(
-        [embedding_input],
-        batch_size=1,
-        show_progress_bar=False,
-        convert_to_numpy=True,
-        normalize_embeddings=False,
-    )[0]
+    # fastembed's embed() returns a generator of numpy ndarrays.
+    vectors = list(encoder.embed([embedding_input]))
+    vector = vectors[0]
     return [float(value) for value in vector.tolist()]

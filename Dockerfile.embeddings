@@ -13,7 +13,9 @@ COPY requirements-embeddings.txt .
 RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt && \
     pip install --no-cache-dir --retries 10 --timeout 120 -r requirements-embeddings.txt && \
-    mkdir -p /app/word_base/word_audio /app/.cache/huggingface
+    mkdir -p /app/word_base/word_audio /app/.cache/huggingface && \
+    python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
+
 
 COPY app ./app
 COPY frontend_shared/src/i18n/messages.json ./frontend_shared/src/i18n/messages.json
