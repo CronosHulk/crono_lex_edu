@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+BILLING_TERMINAL_STATUSES = {"success", "failure", "reversed", "expired"}
+BILLING_PAYMENT_STATUSES = {"created", "invoice_created", "processing", *BILLING_TERMINAL_STATUSES}
+BILLING_PROVIDER_MONOBANK = "monobank"
+
+BILLING_PROVIDER_INSTANT = "instant"
+BILLING_PAYMENT_PROVIDERS = {BILLING_PROVIDER_MONOBANK, BILLING_PROVIDER_INSTANT}
+BILLING_PROVIDER_KEY_PATTERN = "^[a-z][a-z0-9_]*$"
+BILLING_PROVIDER_KEY_CHECK_SQL = f"provider ~ '{BILLING_PROVIDER_KEY_PATTERN}'"
+BILLING_PROVIDER_MODE_KEY_PATTERN = "^[a-z][a-z0-9_]*$"
+BILLING_PAYMENT_PROVIDER_MODE_CHECK_SQL = f"provider_mode ~ '{BILLING_PROVIDER_MODE_KEY_PATTERN}'"
+BILLING_PROVIDER_MODES = {"instant", "test", "production"}
+MONOBANK_AUDIT_DIRECTIONS = {"outgoing", "incoming"}
+MONOBANK_AUDIT_PROVIDER_MODES = {"test", "production", "unknown"}

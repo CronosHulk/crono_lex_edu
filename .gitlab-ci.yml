@@ -1,0 +1,60 @@
+stages:
+  - test
+  - deploy
+
+.python_test:
+  stage: test
+  tags:
+    - deploy
+  before_script:
+    - cd "$CI_PROJECT_DIR"
+    - python3 -m venv ".venv-$CI_JOB_NAME"
+    - .venv-$CI_JOB_NAME/bin/pip install --upgrade pip setuptools wheel
+    - .venv-$CI_JOB_NAME/bin/pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
+  only:
+    - main
+
+.frontend_test:
+  stage: test
+  tags:
+    - deploy
+  after_script:
+    - cd "$CI_PROJECT_DIR"
+    - make frontend_clean
+  only:
+    - main
+
+backend_tests:
+  extends: .python_test
+  script:
+    - PYTHON=".venv-$CI_JOB_NAME/bin/python" make backend_tests
+
+frontend_tests:
+  extends: .frontend_test
+  script:
+    - cd "$CI_PROJECT_DIR"
+    - make frontend_tests
+
+deploy_job:
+  stage: deploy
+  tags:
+    - deploy
+  needs:
+    - backend_tests
+    - frontend_tests
+  script:
+    - cd /var/www/cronolex
+    - if [ ! -d ".git" ]; then git clone git@gitlab.com:cron.gmax-group/cronolex.git .; else git restore --worktree --staged AGENTS.md agents .agents 2>/dev/null || true; git pull origin main; fi
+    - rm -rf AGENTS.md agents .agents
+    - |
+      compose_build() {
+        COMPOSE_PARALLEL_LIMIT=1 BUILDX_NO_DEFAULT_ATTESTATIONS=1 docker compose --env-file project.env build app-api app-bot app-import-scheduler app-billing-reconciliation app-subscription-maintenance app-embedding-worker web-admin web-client
+      }
+      compose_build || { echo "Compose build failed; retrying once after transient registry/network error."; sleep 30; compose_build; }
+    - docker compose --env-file project.env rm -sf app-api app-bot app-import-scheduler app-billing-reconciliation app-subscription-maintenance app-embedding-worker app-database-backup web-admin web-client
+    - docker compose --env-file project.env up -d --no-build --remove-orphans
+    - docker compose --env-file project.env restart caddy
+    - docker image prune -f || true
+    - docker builder prune -f --filter until=168h || true
+  only:
+    - main

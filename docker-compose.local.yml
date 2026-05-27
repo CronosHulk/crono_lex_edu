@@ -1,0 +1,25 @@
+services:
+  app-api:
+    environment:
+      APP__ENV: development
+      APP__ADMIN_DEV_LOGIN_ENABLED: "true"
+      APP__ADMIN_COOKIE_SECURE: "false"
+      APP__WEB_BASE_URL: https://cronolex.local
+      APP__BOT_ENABLED: "false"
+
+  app-bot:
+    restart: "no"
+    environment:
+      APP__ENV: development
+      APP__ADMIN_DEV_LOGIN_ENABLED: "true"
+      APP__ADMIN_COOKIE_SECURE: "false"
+      APP__WEB_BASE_URL: https://cronolex.local
+      APP__BOT_ENABLED: "false"
+
+  app-import-scheduler:
+    environment:
+      APP__ENV: development
+      APP__ADMIN_DEV_LOGIN_ENABLED: "true"
+      APP__ADMIN_COOKIE_SECURE: "false"
+      APP__WEB_BASE_URL: https://cronolex.local
+      APP__BOT_ENABLED: "false"

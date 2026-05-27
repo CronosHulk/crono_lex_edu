@@ -1,0 +1,69 @@
+project.env
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+admin_web/coverage/
+admin_web/node_modules/
+client_web/coverage/
+client_web/dist/
+client_web/node_modules/
+runtime/
+storage/video_pipeline/
+
+# Deprecated local CSV-first word candidate workflow.
+# Runtime is DB-first; keep these ignored if old root-owned local artifacts exist.
+word_base/snapshot/
+word_base/ready to upload/
+word_base/pending requests from users/
+word_base/google_sheet_imports/prepared/clean_words.examples.generated.jsonl
+word_base/google_sheet_imports/prepared/clean_words.examples.generated.status.json
+word_base/google_sheet_imports/prepared/clean_words.examples.generated.report.json
+word_base/google_sheet_imports/prepared/clean_words.examples.migration.report.json
+
+# Generated/local audio layouts. Active tracked seed audio lives under word_base/base/.
+word_base/exercise_texts/audio/
+word_base/user/
+word_base/phrase_audio/
+word_base/word_audio/
+
+# Tooling and local environment files
+.python-version
+.env
+.env.*
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.codex
+log/
+database_backup/
+word_base/embeddings_smoke.jsonl
+word_base/reading_listening/
+tests/test_reading_listening_poc.py
+monobank-acquiring/

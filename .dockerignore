@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+*.pyc
+admin_web/coverage
+admin_web/node_modules
+runtime
+word_base

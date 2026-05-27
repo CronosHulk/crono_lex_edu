@@ -1,0 +1,14 @@
+psycopg[binary]==3.2.10
+psycopg-pool==3.2.6
+sqlalchemy==2.0.43
+pgvector==0.3.6
+python-telegram-bot==22.0
+tornado==6.4.2
+fastapi==0.116.1
+uvicorn==0.35.0
+httpx==0.28.1
+ecdsa==0.19.1
+cryptography==46.0.3
+pytest==8.4.1
+pytest-cov==6.2.1
+ruff==0.14.3

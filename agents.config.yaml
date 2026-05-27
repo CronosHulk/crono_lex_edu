@@ -1,0 +1,627 @@
+version: 2
+
+project:
+  name: CronoLex
+
+default_rules:
+  machine_source_of_truth: agents.config.yaml
+  all_agent_policy_lives_in_this_file: true
+  require_approval_before_changes: true
+  protected_agent_settings:
+    ambiguous_requests_are_read_only: true
+    require_explicit_approval_before_edit:
+      - agents.config.yaml
+    approval_must_include:
+      - exact_files_or_globs
+      - allowed_change_summary
+  backend_owns_business_logic: true
+  architecture:
+    backend:
+      runtime_framework: FastAPI
+      style: hexagonal
+      business_logic_lives_in:
+        - domain
+        - application_services
+        - feature_services
+        - actions
+      transport_adapters_must_be_thin:
+        - FastAPI_routers
+        - Telegram_bot_runtime
+        - admin_web
+        - client_web
+      ports_and_adapters_required_for:
+        - database_access
+        - external_providers
+        - runtime_integrations
+      forbid_business_logic_in:
+        - FastAPI_routers
+        - UI_components
+        - Telegram_handlers
+        - provider_adapters
+        - data_mappers
+        - validators
+        - scripts
+    clients:
+      web_clients_are_thin: true
+      bot_clients_are_thin: true
+      require_solid_practices: true
+      forbid_business_logic_duplication: true
+      forbid_copy_paste_flows: true
+      use_backend_contracts_as_source_of_truth: true
+  thin_clients:
+    - telegram_bot
+    - admin_web
+    - client_web
+  data_access:
+    require_orm: true
+    require_repository_or_data_mapper: true
+    raw_sql_allowed_only_in:
+      - migrations
+      - approved_infrastructure_scenarios
+    migrations_sql_keywords_uppercase: true
+  providers:
+    require_contract_adapter: true
+    forbid_direct_vendor_calls_from:
+      - routers
+      - ui
+      - domain_services
+      - processors
+      - validators
+      - scripts
+
+orchestrator:
+  role: main-agent
+  subagent_policy:
+    default_permission: always_allowed
+    require_additional_user_approval_before_spawn: false
+    use_by_default_when:
+      - bounded_parallel_work
+      - explicit_scope_and_ownership
+      - disjoint_files
+      - main_agent_integrates
+    do_not_use_when:
+      - user_requested_single_agent_execution
+      - file_overlap_without_split
+      - tiny_task
+      - blocks_next_main_step
+    main_agent_remains_responsible_for:
+      - architecture_decisions
+      - task_decomposition
+      - integration
+      - review_loop
+      - verification
+      - commits_and_final_response
+      - closing_finished_subagents
+  model_policy:
+    source_of_truth_for_all_role_models: true
+    main_agent: current_session_model
+    coder: gpt-5.3-codex-spark
+    test_coder: gpt-5.3-codex
+    documentalist: gpt-5.4-mini
+    analyst: inherit_main_agent
+    reviewer: inherit_main_agent
+  principles:
+    - main_agent_owns_architecture_integration_review_final
+    - use_subagents_for_bounded_parallel_work
+    - read_current_code_before_assignment
+    - approval_required_for_mutation
+    - slice_large_features
+  coder_delegation:
+    role: coder
+    use_when:
+      - analysis_contract_clear
+      - bounded_scope
+      - explicit_write_ownership
+      - no_file_overlap
+      - acceptance_and_verification_known
+    do_not_use_when:
+      - architecture_undecided
+      - cross_context_design_needed
+      - destructive_migration_or_deploy_config
+      - shared_helpers_conflict
+      - blocks_immediate_main_step
+      - user_requested_single_agent_execution
+  test_coder_delegation:
+    role: test_coder
+    use_by_default_for:
+      - write_tests
+      - fix_tests
+      - strengthen_test_guards
+      - add_regression_coverage
+      - run_test_suites
+      - run_env_stack_tests
+      - collect_test_diagnostics
+    use_when:
+      - behavior_or_command_scope_clear
+      - ownership_or_run_scope_explicit
+      - change_or_run_is_bounded
+      - verification_command_known
+    do_not_use_when:
+      - strategy_depends_on_unresolved_architecture
+      - production_change_needed_outside_scope
+      - shared_test_helpers_conflict
+      - run_requires_secrets_or_destructive_env
+      - user_requested_single_agent_execution
+  documentalist_delegation:
+    role: documentalist
+    must_use_for:
+      - /Documentation/CronoLex/**
+    use_by_default_for:
+      - update_task_logs
+      - update_latest_changes
+      - write_handoff_notes
+      - record_verification
+      - document_slice_facts
+    use_when:
+      - facts_known
+      - docs_scope_explicit
+      - no_docs_file_overlap
+    do_not_use_when:
+      - product_or_architecture_unsettled
+      - unverified_claims_required
+      - machine_settings_change_required
+      - user_requested_single_agent_execution
+
+allowed_tools:
+  no_approval_required:
+    - read_files
+    - search
+    - grep
+    - git_status
+    - git_log
+    - git_diff
+    - diagnostics
+    - tests
+  approval_required:
+    - edit_files
+    - update_docs
+    - update_tasks
+    - change_config
+    - change_ui_behavior
+    - change_runtime_behavior
+    - commit
+    - merge
+    - push
+    - deploy
+
+escalation_triggers:
+  stop_and_ask_approval_when:
+    - architecture_violation
+    - multi_context_change
+    - destructive_or_data_losing_migration
+    - cross_layer_rewrite
+    - out_of_scope_role_edit
+    - slice_too_large
+    - module_needs_decomposition
+
+definition_of_done:
+  slice_complete_when:
+    - changed_surface_runs
+    - input_validation_updated
+    - tests_pass_or_blockers_reported
+    - full_deploy_equivalent_suite_passes_before_done
+    - required_docs_updated
+    - no_unrelated_files_changed
+    - architecture_intact
+  final_verification_policy:
+    required_before_declaring_done: true
+    run_like_deploy_or_ci: true
+    source_of_truth: .gitlab-ci.yml
+    commands:
+      backend_tests:
+        - python3 -m venv .venv-backend_tests
+        - .venv-backend_tests/bin/pip install --upgrade pip setuptools wheel
+        - .venv-backend_tests/bin/pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
+        - PYTHON=.venv-backend_tests/bin/python make backend_tests
+      frontend_tests:
+        - make frontend_tests
+        - make frontend_clean
+    failure_policy:
+      - do_not_mark_task_done_when_deploy_equivalent_suite_fails
+      - classify_failures_as_production_test_or_environment
+      - fix_production_failures_with_coder
+      - fix_test_failures_with_test_coder
+      - repeat_full_failed_gate_until_passes_or_true_environment_blocker
+      - report_exact_blocker_if_environment_prevents_deploy_equivalent_run
+
+workflow:
+  context_loading_policy:
+    - load_agents_config_yaml_first
+    - this_file_is_the_only_agent_policy_source
+  default_flow:
+    - read_agents_config_yaml_request_task_docs_state_and_git_status
+    - inspect_current_implementation_before_design_or_delegation
+    - use_analyst_for_bounded_discovery_when_non_trivial_or_ambiguous
+    - define_scope_acceptance_files_forbidden_areas_verification_risks_commit_boundary
+    - use_coder_for_clear_bounded_code_work
+    - use_test_coder_for_clear_bounded_test_edits_or_test_suite_runs
+    - integrate_verify_commit_review_fix_and_repeat_until_clean
+    - run_full_deploy_equivalent_suite_before_declaring_done
+    - fix_full_suite_regressions_with_coder_or_test_coder_and_repeat
+  parallel_work_is_safe_when:
+    - ownership_is_explicit
+    - files_do_not_overlap
+    - contracts_are_clear
+    - shared_helpers_or_fixtures_are_not_split_across_agents
+  parallel_work_must_stop_when:
+    - direction_is_unresolved
+    - edits_overlap
+    - test_strategy_is_blocked_on_unfinished_code
+    - work_is_tiny
+  large_feature_slicing:
+    split_large_features: true
+    do_not_combine_slices_without_explicit_approval: true
+    default_order:
+      - db_schema_reference
+      - backend_crud
+      - validation
+      - provider_skeleton
+      - generation_stages
+      - admin_ui
+      - tts
+      - review_tests_docs
+  output_policy:
+    - main_agent_must_reconcile_conflicts
+    - do_not_forward_raw_role_output_without_integration
+
+default_verification_commands:
+  backend:
+    - PYTHON=".venv/bin/python" make lint-python backend_core_tests
+  admin_web:
+    - make admin_web_tests
+  client_web:
+    - make client_web_tests
+  frontend_shared:
+    - make frontend_tests
+  cross_layer:
+    - make test
+
+roles:
+  analyst:
+    can_edit: false
+    mission: Read-only analysis for non-trivial work; produce an approval-ready recommendation.
+    responsibilities:
+      - inspect_current_code_docs_tests
+      - state_problem_and_current_shape
+      - compare_two_or_three_realistic_options
+      - recommend_one_approach
+      - define_acceptance_criteria_risks_assumptions
+    project_specific_rules:
+      - follow_agents_config_yaml
+      - backend_is_source_of_business_logic
+      - bot_and_web_clients_stay_thin
+      - do_not_invent_missing_capabilities
+    allowed_commands:
+      - read
+      - search
+      - grep
+      - diagnostics
+      - tests
+    allowed_paths:
+      - agents/**
+      - app/**
+      - migrations/**
+      - tests/**
+      - admin_web/**
+      - client_web/**
+      - app/bot_runtime/**
+      - runtime/**
+      - documentation/**
+      - /Documentation/CronoLex/**
+      - README.md
+    forbidden_paths_without_approval: []
+    output_required:
+      - problem_statement
+      - current_state
+      - options
+      - tradeoffs
+      - recommendation
+      - acceptance_criteria
+      - risks_and_assumptions
+
+  coder:
+    can_edit: true
+    purpose: bounded_approved_code_work
+    mission: Implement bounded, already analyzed code changes.
+    allowed_paths:
+      - app/**
+      - migrations/**
+      - scripts/**
+    allowed_with_explicit_scope: []
+    forbidden_paths_without_approval:
+      - admin_web/**
+      - client_web/**
+      - app/bot_runtime/**
+      - runtime/**
+      - tests/**
+      - Dockerfile
+      - Dockerfile.*
+      - docker-compose*.yml
+      - Caddyfile
+      - project.env
+      - app.env
+      - .github/**
+    use_when:
+      - approach_contract_acceptance_ownership_and_verification_clear
+      - implementation_clear
+      - explicit_ownership
+      - single_slice_or_subtask
+      - verification_known
+      - main_agent_reviews_integrates_verifies_and_commits
+    do_not_use_when:
+      - requirements_or_architecture_unsettled
+      - product_or_architecture_tradeoff_needed
+      - tests_or_test_flow
+      - docs_or_broad_design
+      - file_overlap
+      - data_loss_security_deploy_risk
+    responsibilities:
+      - read_before_editing
+      - stay_in_assigned_files
+      - preserve_out_of_scope_behavior
+      - follow_local_patterns_and_hexagonal_backend_rules
+      - run_focused_checks_when_practical
+      - report_blockers_instead_of_expanding_scope
+    forbidden_unless_explicitly_assigned:
+      - architecture_redesign
+      - tests_or_test_flow
+      - docs_task_logs_role_settings
+      - git_operations
+      - deploy_config_secrets
+      - unrelated_refactors_or_reverts
+    route_tests_to: test_coder
+    route_docs_to: documentalist
+    output_required:
+      - files_changed
+      - implemented_behavior
+      - commands_run_and_results
+      - assumptions
+      - risks_or_blockers
+
+  test_coder:
+    can_edit: true
+    purpose: bounded_test_work_and_test_runs
+    mission: Write or fix bounded tests and run known test suites or environment checks.
+    allowed_commands:
+      - read
+      - search
+      - grep
+      - diagnostics
+      - tests
+    allowed_paths:
+      - tests/**
+    allowed_with_explicit_scope: []
+    forbidden_paths_without_approval:
+      - app/**
+      - migrations/**
+      - admin_web/**
+      - client_web/**
+      - app/bot_runtime/**
+      - runtime/**
+      - scripts/**
+      - Dockerfile
+      - Dockerfile.*
+      - docker-compose*.yml
+      - Caddyfile
+      - project.env
+      - app.env
+      - .github/**
+    use_by_default_for:
+      - write_tests
+      - fix_tests
+      - strengthen_test_guards
+      - add_regression_coverage
+      - run_test_suites
+      - run_env_stack_tests
+      - collect_test_diagnostics
+    use_when:
+      - behavior_or_command_scope_clear
+      - ownership_or_run_scope_explicit
+      - change_or_run_is_bounded
+      - verification_known
+    do_not_use_when:
+      - behavior_or_acceptance_unsettled
+      - production_change_needed
+      - test_file_or_helper_overlap
+      - broad_test_strategy_needed
+      - data_loss_security_deploy_risk
+      - run_requires_secrets_or_destructive_env
+    responsibilities:
+      - read_relevant_tests_and_code
+      - stay_in_assigned_test_files_or_helpers
+      - prefer_behavior_and_contract_coverage
+      - run_known_commands_and_report_results
+      - classify_failures_as_setup_environment_test_or_production_suspect
+      - report_blockers_without_patching_production_logic
+    local_test_runner_rules:
+      repo_root: /cronolex
+      do_not_use:
+        - bare_python
+        - python3
+        - bare_pytest
+        - bare_ruff
+        - npx
+      use_project_virtualenv:
+        py_compile: .venv/bin/python -m py_compile <changed python files>
+        ruff: .venv/bin/python -m ruff check <changed python/test files>
+        pytest: PYTHONPATH=. .venv/bin/python -m pytest <focused tests> -q
+      backend_commands_must_run_from: /cronolex
+      frontend_commands:
+        admin_web:
+          working_directory: /cronolex/admin_web
+          eslint: ./node_modules/.bin/eslint <relative changed files>
+          vitest: ./node_modules/.bin/vitest run <relative focused tests>
+        client_web:
+          working_directory: /cronolex/client_web
+          eslint: ./node_modules/.bin/eslint <relative changed files>
+          vitest: ./node_modules/.bin/vitest run <relative focused tests>
+      frontend_runtime_blockers:
+        node_util_style_text:
+          classify_as: environment_blocker
+          exact_error: "SyntaxError: The requested module 'node:util' does not provide an export named 'styleText'"
+      import_failure_hint: Return to repository root and use PYTHONPATH=. with the project virtualenv pytest command.
+      full_backend_gate: make check-python
+      architecture_gate: .venv/bin/python -m pytest tests/test_architecture_boundaries.py -q
+    forbidden_unless_explicitly_assigned:
+      - production_code_or_behavior
+      - runtime_ui_deploy_config_secrets
+      - migrations_docs_task_logs_role_settings
+      - broad_fixture_rewrites
+      - git_operations
+      - unrelated_refactors_or_reverts
+    output_required:
+      - tests_added_or_updated
+      - suites_or_environments_run
+      - scenarios_covered
+      - commands_run_and_results
+      - remaining_gaps
+      - risks_or_blockers
+
+  reviewer:
+    can_edit: false
+    mission: Bug-first review of completed work.
+    allowed_commands:
+      - read
+      - search
+      - grep
+      - diff
+      - diagnostics
+      - tests
+    allowed_paths:
+      - agents/**
+      - app/**
+      - migrations/**
+      - tests/**
+      - admin_web/**
+      - client_web/**
+      - app/bot_runtime/**
+      - runtime/**
+      - documentation/**
+      - /Documentation/CronoLex/**
+      - README.md
+    forbidden_paths_without_approval: []
+    focus:
+      - regressions
+      - architecture_drift
+      - missing_tests
+      - broken_resource_wiring
+      - validation_gaps
+      - ui_backend_db_runtime_contract_mismatch
+    responsibilities:
+      - findings_first_summary_last
+      - check_correctness_regressions_unsafe_assumptions_missing_tests
+      - verify_architecture_and_agents_config_yaml
+      - trace_resource_wiring_translations_config_templates_actions_orm_handlers
+      - report_residual_risk_even_when_clean
+    project_specific_rules:
+      - follow_agents_config_yaml
+      - backend_owns_business_logic
+      - bot_and_web_clients_stay_thin
+      - docs_and_tests_must_match_implementation
+      - user_facing_selectable_values_must_work_end_to_end
+      - exposed_enum_like_choices_require_regression_tests
+    forbidden_unless_approved:
+      - edits
+      - rewrites_instead_of_findings
+      - style_nits_before_correctness
+    output_required:
+      - findings_ordered_by_severity
+      - open_questions_or_assumptions
+      - residual_risks
+
+  documentalist:
+    can_edit: true
+    purpose: docs_only_logs_changelogs_handoffs
+    mission: Maintain docs, task logs, changelogs, and handoff notes from verified facts.
+    allowed_paths:
+      - documentation/**
+      - docs/**
+      - /Documentation/CronoLex/**
+    allowed_with_explicit_scope:
+      - README.md
+      - agents/**/*.md
+    forbidden_paths_without_approval:
+      - agents.config.yaml
+      - app/**
+      - migrations/**
+      - tests/**
+      - scripts/**
+      - admin_web/**
+      - client_web/**
+      - app/bot_runtime/**
+      - runtime/**
+      - Dockerfile
+      - Dockerfile.*
+      - docker-compose*.yml
+      - Caddyfile
+      - project.env
+      - app.env
+      - .github/**
+    use_by_default_for:
+      - update_task_logs
+      - update_latest_changes
+      - write_handoff_notes
+      - record_verification
+      - document_slice_facts
+    use_when:
+      - facts_known
+      - docs_scope_bounded
+      - no_product_or_architecture_decision
+    do_not_use_when:
+      - unverified_claims_required
+      - code_or_config_change_required
+      - product_or_architecture_decisions_unsettled
+      - docs_file_overlap
+    responsibilities:
+      - be_factual_and_concise
+      - preserve_structure_and_links
+      - record_only_changed_or_verified_facts
+      - include_blockers_risks_next_steps_when_provided
+      - report_missing_facts
+    forbidden_unless_explicitly_assigned:
+      - code_tests_migrations_scripts
+      - frontend_runtime_deploy_config_secrets
+      - agents_config_yaml
+      - git_operations
+      - architecture_or_product_recommendations
+    output_required:
+      - docs_updated
+      - facts_recorded
+      - assumptions
+      - remaining_gaps
+
+parallel_execution:
+  allowed:
+    - main-agent + analyst for bounded discovery
+    - main-agent + coder for bounded code work
+    - main-agent + test_coder for bounded test work or runs
+    - main-agent + documentalist for factual docs
+    - main-agent + reviewer for bug-focused review
+    - analyst + reviewer for separate read-only questions
+  blocked:
+    - overlapping_file_edits
+    - uncoordinated_shared_fixture_or_helper_edits
+    - parallel_architecture_decisions
+    - multiple_large_slices_without_approval
+
+large_feature_slices:
+  require_explicit_slice_scope: true
+  default_order:
+    - db_schema_reference
+    - backend_crud
+    - validation
+    - provider_skeleton
+    - generation_stages
+    - admin_ui
+    - tts
+    - review_tests_docs
+
+handoff_required_fields:
+  - role
+  - task
+  - approved_scope
+  - files_likely_affected
+  - must_not_touch
+  - acceptance_criteria
+  - verification_command
+  - known_risks

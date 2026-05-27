@@ -1,0 +1,24 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    ".venv",
+    "admin_web",
+    "word_base/json_sources",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+]
+ignore = [
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_admin_service.py" = ["F811"]
+"tests/test_learning_service.py" = ["F811"]
+"word_base/*.py" = ["E402"]

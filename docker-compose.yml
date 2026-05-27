@@ -1,0 +1,237 @@
+services:
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      app-api:
+        condition: service_started
+      app-bot:
+        condition: service_started
+      web-client:
+        condition: service_started
+      web-admin:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  web-client:
+    build:
+      context: ./client_web
+      dockerfile: Dockerfile
+      additional_contexts:
+        frontend_shared: ./frontend_shared
+    restart: unless-stopped
+
+  web-admin:
+    build:
+      context: ./admin_web
+      dockerfile: Dockerfile
+      additional_contexts:
+        frontend_shared: ./frontend_shared
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app-api:
+    build:
+      context: .
+      args:
+        INSTALL_EMBEDDINGS: "false"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__BOT_ENABLED: "false"
+      APP__ADMIN_DEV_LOGIN_ENABLED: "false"
+      APP__ADMIN_COOKIE_SECURE: "true"
+      APP__API_BASE_URL: http://127.0.0.1:8000
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/exercise_texts/audio:/app/word_base/exercise_texts/audio
+      - ./word_base/user:/app/word_base/user
+    command: ["python", "-m", "app.api_main"]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  app-bot:
+    build:
+      context: .
+      args:
+        INSTALL_EMBEDDINGS: "false"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app-api:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__ADMIN_DEV_LOGIN_ENABLED: "false"
+      APP__ADMIN_COOKIE_SECURE: "true"
+      APP__API_BASE_URL: http://app-api:8000
+      APP__BOT_REMINDER_POLL_MINUTES: 5
+      APP__BOT_MESSAGE_CLEANUP_POLL_SECONDS: 10
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/user:/app/word_base/user
+    command: ["python", "-m", "app.bot_main"]
+    expose:
+      - "8080"
+
+  app-import-scheduler:
+    build:
+      context: .
+      args:
+        INSTALL_EMBEDDINGS: "false"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__BOT_ENABLED: "false"
+      APP__ADMIN_DEV_LOGIN_ENABLED: "false"
+      APP__ADMIN_COOKIE_SECURE: "true"
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/user:/app/word_base/user
+    command: ["python", "-m", "app.import_scheduler_worker_main"]
+
+  app-billing-reconciliation:
+    build:
+      context: .
+      args:
+        INSTALL_EMBEDDINGS: "false"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__BOT_ENABLED: "false"
+      APP__ADMIN_DEV_LOGIN_ENABLED: "false"
+      APP__ADMIN_COOKIE_SECURE: "true"
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/user:/app/word_base/user
+    command: ["python", "-m", "app.billing_reconciliation_worker_main"]
+
+  app-subscription-maintenance:
+    build:
+      context: .
+      args:
+        INSTALL_EMBEDDINGS: "false"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__BOT_ENABLED: "false"
+      APP__ADMIN_DEV_LOGIN_ENABLED: "false"
+      APP__ADMIN_COOKIE_SECURE: "true"
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/user:/app/word_base/user
+    command: ["python", "-m", "app.subscription_maintenance_worker_main"]
+
+  app-embedding-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.embeddings
+    restart: unless-stopped
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__ENV: production
+      APP__BOT_ENABLED: "false"
+      HF_HOME: /app/.cache/huggingface
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./word_base/base:/app/word_base/base
+      - ./word_base/user:/app/word_base/user
+      - huggingface_cache:/app/.cache/huggingface
+    command: ["python", "-m", "app.embedding_worker_main"]
+
+  app-database-backup:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - app.env
+      - project.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP__DATABASE_BACKUP_DIR: /backup
+      APP__DATABASE_BACKUP_HOUR: 0
+    volumes:
+      - ./scripts/database_backup.sh:/usr/local/bin/cronolex-database-backup:ro
+      - ./database_backup:/backup
+    command: ["cronolex-database-backup"]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  huggingface_cache:
