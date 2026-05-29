@@ -92,3 +92,30 @@ def set_required_settings(monkeypatch) -> None:
     monkeypatch.setenv("DB_NAME", "cronolex")
     monkeypatch.setenv("DB_USER", "user")
     monkeypatch.setenv("DB_PASSWORD", "password")
+
+
+def test_load_settings_reads_from_env_file_variables(monkeypatch) -> None:
+    monkeypatch.delenv("BOT_TOKEN", raising=False)
+    monkeypatch.delenv("DB_NAME", raising=False)
+    monkeypatch.delenv("DB_USER", raising=False)
+    monkeypatch.delenv("DB_PASSWORD", raising=False)
+
+    project_env_content = """
+    BOT_TOKEN=token-from-env-var
+    DB_NAME=db-from-env-var
+    """
+    app_env_content = """
+    DB_USER=user-from-env-var
+    DB_PASSWORD=password-from-env-var
+    """
+
+    monkeypatch.setenv("PROJECT_ENV_FILE", project_env_content)
+    monkeypatch.setenv("APP_ENV_FILE", app_env_content)
+
+    settings = load_settings()
+
+    assert settings.bot_token == "token-from-env-var"
+    assert settings.db_name == "db-from-env-var"
+    assert settings.db_user == "user-from-env-var"
+    assert settings.db_password == "password-from-env-var"
+

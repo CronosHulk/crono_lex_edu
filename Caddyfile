@@ -19,11 +19,11 @@ cronolex.uno {
 	}
 
 	handle_path /admin* {
-		reverse_proxy web-admin:80
+		reverse_proxy web-admin:8080
 	}
 
 	handle {
-		reverse_proxy web-client:80
+		reverse_proxy web-client:8080
 	}
 }
 
@@ -48,10 +48,10 @@ cronolex.local {
 	}
 
 	handle_path /admin* {
-		reverse_proxy web-admin:80
+		reverse_proxy web-admin:8080
 	}
 
 	handle {
-		reverse_proxy web-client:80
+		reverse_proxy web-client:8080
 	}
 }

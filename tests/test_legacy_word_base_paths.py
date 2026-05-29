@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 DEPRECATED_WORD_BASE_PATHS = (
@@ -93,16 +92,13 @@ def _line_references_artifact(line: str, artifact_name: str) -> bool:
 
 
 def _tracked_word_base_base_mp3_paths(root: Path) -> list[Path]:
-    result = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "word_base/base"],
-        capture_output=True,
-        check=True,
-        text=True,
-    )
+    base_dir = root / "word_base/base"
+    if not base_dir.exists():
+        return []
     return [
-        Path(line)
-        for line in result.stdout.splitlines()
-        if line.endswith(".mp3")
+        p.relative_to(root)
+        for p in base_dir.rglob("*.mp3")
+        if p.is_file()
     ]
 
 

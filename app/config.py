@@ -79,24 +79,60 @@ class Settings:
     monobank_token: str = ""
 
 
+def load_env_file(path: str) -> None:
+    import os
+    for p in (path, os.path.join("/app", path)):
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        key, val = line.split("=", 1)
+                        key = key.strip()
+                        val = val.strip().strip("'\"")
+                        if key:
+                            os.environ.setdefault(key, val)
+            break
+
+
 def load_settings() -> Settings:
+    import sys
+    if "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
+        load_env_file("project.env")
+        load_env_file("app.env")
+    # Загружаем настройки из контента файлов .env, переданных как переменные окружения в GCP
+    for env_var in ("PROJECT_ENV_FILE", "APP_ENV_FILE"):
+        val = os.getenv(env_var)
+        if val:
+            for line in val.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, v = line.split("=", 1)
+                    key = key.strip()
+                    v = v.strip().strip("'\"")
+                    if key:
+                        os.environ.setdefault(key, v)
     return Settings(
         bot_token=os.getenv("BOT_TOKEN", ""),
         db_host=os.getenv("DB_HOST", "localhost"),
         db_port=int(os.getenv("DB_PORT", "5432")),
-        db_name=os.environ["DB_NAME"],
-        db_user=os.environ["DB_USER"],
-        db_password=os.environ["DB_PASSWORD"],
+        db_name=os.getenv("DB_NAME", ""),
+        db_user=os.getenv("DB_USER", ""),
+        db_password=os.getenv("DB_PASSWORD", ""),
         app_env=os.getenv("APP__ENV", "development"),
         app_timezone=os.getenv("APP__TIMEZONE", "Europe/Kyiv"),
         app_host=os.getenv("APP__HOST", "0.0.0.0"),
-        app_port=int(os.getenv("APP__PORT", "8000")),
+        app_port=int(os.getenv("PORT") or os.getenv("APP__PORT") or "8000"),
         app_api_base_url=os.getenv("APP__API_BASE_URL", "http://127.0.0.1:8000"),
         app_web_base_url=os.getenv("APP__WEB_BASE_URL", "https://cronolex.uno"),
         app_bot_username=os.getenv("APP__BOT_USERNAME", ""),
         app_bot_enabled=os.getenv("APP__BOT_ENABLED", "true").lower() == "true",
         app_bot_webhook_listen_host=os.getenv("APP__BOT_WEBHOOK_LISTEN_HOST", "0.0.0.0"),
-        app_bot_webhook_port=int(os.getenv("APP__BOT_WEBHOOK_PORT", "8080")),
+        app_bot_webhook_port=int(os.getenv("PORT") or os.getenv("APP__BOT_WEBHOOK_PORT") or "8080"),
         app_bot_webhook_path=os.getenv("APP__BOT_WEBHOOK_PATH", "telegram/webhook"),
         app_bot_webhook_url=os.getenv("APP__BOT_WEBHOOK_URL", ""),
         app_bot_webhook_secret_token=os.getenv("APP__BOT_WEBHOOK_SECRET_TOKEN", ""),

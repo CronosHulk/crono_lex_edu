@@ -26,6 +26,8 @@ services:
       additional_contexts:
         frontend_shared: ./frontend_shared
     restart: unless-stopped
+    environment:
+      PORT: 8080
 
   web-admin:
     build:
@@ -34,6 +36,8 @@ services:
       additional_contexts:
         frontend_shared: ./frontend_shared
     restart: unless-stopped
+    environment:
+      PORT: 8080
 
   postgres:
     image: pgvector/pgvector:pg16

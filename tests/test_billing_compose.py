@@ -60,41 +60,19 @@ def test_local_compose_disabled_bot_does_not_inherit_restart_policy() -> None:
 def test_gitlab_deploy_builds_default_compose_app_services_before_no_build_up() -> None:
     pipeline = Path(".gitlab-ci.yml").read_text(encoding="utf-8")
 
-    build_line = (
-        "docker compose --env-file project.env build app-api app-bot app-import-scheduler "
-        "app-billing-reconciliation app-subscription-maintenance app-embedding-worker web-admin web-client"
-    )
-    rm_line = (
-        "docker compose --env-file project.env rm -sf app-api app-bot app-import-scheduler "
-        "app-billing-reconciliation app-subscription-maintenance app-embedding-worker app-database-backup "
-        "web-admin web-client"
-    )
-
-    assert build_line in pipeline
-    assert rm_line in pipeline
-    assert "rm -sf" in pipeline
+    assert "gcloud run deploy" in pipeline
+    assert "gcloud run jobs deploy" in pipeline
     assert "app-video-worker" not in pipeline
     assert "app-video-publishing-worker" not in pipeline
     assert "app-video-publishing-scheduler" not in pipeline
-    assert "docker compose --env-file project.env up -d --no-build --remove-orphans" in pipeline
 
 
 def test_gitlab_deploy_keeps_freshly_built_images_before_no_build_up() -> None:
     pipeline = Path(".gitlab-ci.yml").read_text(encoding="utf-8")
 
-    build_index = pipeline.index("docker compose --env-file project.env build")
-    up_index = pipeline.index("docker compose --env-file project.env up -d --no-build")
-    pre_build_commands = pipeline[:build_index]
-    post_build_commands = pipeline[build_index:up_index]
-
-    assert "docker buildx prune" not in pre_build_commands
-    assert "docker builder prune" not in pre_build_commands
-    assert "docker image prune -a" not in pre_build_commands
-    assert "docker system prune" not in pre_build_commands
-    assert "docker image prune -a" not in post_build_commands
-    assert "docker system prune" not in post_build_commands
-    assert "compose_build ||" in pipeline
-    assert "retrying once after transient registry/network error" in pipeline
+    assert "docker build" in pipeline
+    assert "docker push" in pipeline
+    assert "docker build -f Dockerfile.embeddings" in pipeline
 
 
 def test_production_compose_does_not_connect_video_pipeline_workers() -> None:

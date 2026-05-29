@@ -11,6 +11,12 @@ from app.config import Settings
 
 
 def build_database_url(settings: Settings) -> str:
+    import os
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        if env_url.startswith("postgresql://"):
+            return "postgresql+psycopg://" + env_url[len("postgresql://"):]
+        return env_url
     return (
         f"postgresql+psycopg://{settings.db_user}:{settings.db_password}"
         f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
